@@ -1,0 +1,60 @@
+---
+- name: Enforce security policies on target servers
+  hosts: all
+  become: true
+  tasks:
+
+    - name: Ensure UFW is installed
+      apt:
+        name: ufw
+        state: present
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: Set UFW default incoming policy to deny
+      ufw:
+        state: enabled
+        default: deny
+        direction: incoming
+
+    - name: Set UFW default outgoing policy to allow
+      ufw:
+        state: enabled
+        default: allow
+        direction: outgoing
+
+    - name: Allow SSH on port 2222
+      ufw:
+        rule: allow
+        port: 2222
+        proto: tcp
+
+    - name: Allow HTTP on port 80
+      ufw:
+        rule: allow
+        port: 80
+        proto: tcp
+
+    - name: Change SSH port to 2222
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Port '
+        line: 'Port 2222'
+      notify: Restart SSH
+
+    - name: Ensure sensitive file permissions
+      file:
+        path: "{{ item.path }}"
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "/etc/ssh/sshd_config", owner: "root", group: "root", mode: "0600" }
+        - { path: "/etc/passwd", owner: "root", group: "root", mode: "0644" }
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: ssh
+        state: restarted
+
+
